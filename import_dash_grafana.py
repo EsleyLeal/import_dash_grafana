@@ -6,37 +6,33 @@ import re
 import getpass
 import time
 
-print("*******************************************************")
-print("*                                                     *")
-print("*                    NETFLOW_FLOWBIX                  *")
-print("*                                                     *")
-print("*                                                     *")
-print("*******************************************************")
-
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-grafana_ip = input("Digite o IP do Grafana : ")
-
+grafana_ip = input("Digite o IP do Grafana: ")
 
 GRAFANA_URL = f"http://{grafana_ip}:3000/api/dashboards/db"
 
-
 API_KEY = getpass.getpass("Digite a Chave Key - Token: ")
-
 
 org_id_or_name = input("Digite ID da organização: ")
 
-
 ORG_API_URL = f"http://{grafana_ip}:3000/api/orgs/{org_id_or_name}"
 
+base_folder_path = "/home/scripts/netflow/import_dash_grafana/dashboards/"
 
-folder_path = "/home/scripts/netflow/import_dash_grafana/dashboards/"
+chosen_folder = input("Escolha a pasta para importar as dashboards ('sem_keyword' ou 'com_keyword'): ")
+
+if chosen_folder == "sem_keyword":
+    folder_path = os.path.join(base_folder_path, "sem_keyword")
+elif chosen_folder == "com_keyword":
+    folder_path = os.path.join(base_folder_path, "com_keyword")
+else:
+    logger.error("Escolha inválida de pasta. Encerrando o programa.")
+    exit(1)
 
 elasticsearch_uid = input("Digite o novo UID para a fonte de dados Elasticsearch: ")
-
+mysql_uid = input("Digite o novo UID para a fonte de dados Mysql: ")
 
 headers = {
     "Accept": "application/json",
@@ -69,13 +65,25 @@ try:
                                 if target_datasource and target_datasource.get("type") == "elasticsearch":
                                     target_datasource["uid"] = elasticsearch_uid
 
-                            # Check and update UID inside "templating"
                             templating = panel_data.get("templating", {})
                             if templating:
                                 for option in templating.get("list", []):
                                     datasource = option.get("datasource", {})
                                     if datasource and datasource.get("type") == "elasticsearch":
                                         datasource["uid"] = elasticsearch_uid
+
+                            templating = panel_data.get("templating", {})
+                            if templating:
+                                for sql in templating.get("list", []):
+                                    datasource = sql.get("datasource", {})
+                                    if datasource and datasource.get("type") == "mysql":
+                                        datasource["uid"] = mysql_uid
+
+                            for panel in panel_data.get("panels", []):
+                                datasource = panel.get("datasource", {})
+                                if datasource and datasource.get("type") == "mysql":
+                                    datasource["uid"] = mysql_uid
+
 
                         file.seek(0)
                         json.dump(panel_data, file, indent=4)
